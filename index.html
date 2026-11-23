@@ -145,27 +145,37 @@ function tick() {
   $("s").textContent = pad(Math.floor(left / 1e3) % 60);
   $("fill").style.width = Math.min(100, Math.max(0, (now - START) / (END - START) * 100)) + "%";
 }
-/* sonido de reloj: tic-tac seco y limpio, generado en el navegador (sin archivos) */
-let ac = null, soundOn = false, beat = 0;
+/* sonido de reloj: replica el tic-tac medido en el audio de referencia (dos tonos que alternan, ~1 s, cola de eco corta) */
+let ac = null, soundOn = false, beat = 0, bus = null;
+const TIC = [914, 1090, 1184, 1992], TAC = [1324, 1395, 1699, 2965];
+function setupAudio() {
+  ac = new (window.AudioContext || window.webkitAudioContext)();
+  const comp = ac.createDynamicsCompressor(); comp.connect(ac.destination);
+  const len = Math.floor(ac.sampleRate * .8), ir = ac.createBuffer(2, len, ac.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.5); }
+  const rev = ac.createConvolver(); rev.buffer = ir;
+  const wet = ac.createGain(); wet.gain.value = .35; rev.connect(wet).connect(comp);
+  bus = ac.createGain(); bus.gain.value = .5; bus.connect(comp); bus.connect(rev);
+}
 function clockSound() {
   if (!soundOn || !ac) return;
-  const t = ac.currentTime + .02, tock = beat++ % 2 === 1;
-  /* clic agudo y seco */
-  const len = Math.floor(ac.sampleRate * .03), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+  const t = ac.currentTime + .02, freqs = beat++ % 2 === 0 ? TIC : TAC;
+  freqs.forEach((fr, i) => {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = "sine"; o.frequency.value = fr;
+    g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(.5 / (1 + i * .25), t + .008); g.gain.setTargetAtTime(.0001, t + .01, .027);
+    o.connect(g).connect(bus); o.start(t); o.stop(t + .4);
+  });
+  /* chasquido breve de aire (energia en 4-8 kHz) */
+  const len = Math.floor(ac.sampleRate * .02), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
   const n = ac.createBufferSource(); n.buffer = buf;
-  const hp = ac.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = tock ? 2200 : 3200;
-  const ng = ac.createGain(); ng.gain.value = .9;
-  n.connect(hp).connect(ng).connect(ac.destination); n.start(t);
-  /* cuerpo de madera/metal corto */
-  const o = ac.createOscillator(), g = ac.createGain();
-  o.type = "triangle"; o.frequency.setValueAtTime(tock ? 520 : 760, t); o.frequency.exponentialRampToValueAtTime(tock ? 300 : 420, t + .05);
-  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.45, t + .002); g.gain.exponentialRampToValueAtTime(.0001, t + .07);
-  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + .09);
+  const bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 5500; bp.Q.value = .8;
+  const ng = ac.createGain(); ng.gain.value = .25; n.connect(bp).connect(ng).connect(bus); n.start(t);
 }
 $("snd").addEventListener("click", () => {
   soundOn = !soundOn;
-  if (soundOn) { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); }
+  if (soundOn) { if (!ac) setupAudio(); ac.resume(); }
   $("snd").textContent = soundOn ? "🔕 Silenciar reloj" : "🔔 Activar sonido del reloj";
   $("snd").setAttribute("aria-pressed", soundOn);
 });
