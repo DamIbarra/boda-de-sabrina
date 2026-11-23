@@ -88,7 +88,8 @@ h1 {
 .dress p { margin: 0; font-size: .9rem; line-height: 1.5; color: var(--blush); }
 .dress em { color: var(--rose); font-style: normal; font-weight: 600; }
 #snd { font: inherit; font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); background: rgba(255,228,236,.06);
-  border: 1px solid rgba(243,211,138,.45); border-radius: 99px; padding: 5px 12px; cursor: pointer; }
+  border: 1px solid rgba(243,211,138,.45); border-radius: 99px; padding: 5px 12px; cursor: pointer;
+  position: fixed; z-index: 5; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); }
 #snd:hover { background: rgba(243,211,138,.15); }
 #snd:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 @keyframes spin { to { rotate: 360deg; } }
